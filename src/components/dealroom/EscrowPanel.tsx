@@ -13,14 +13,20 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 import { useWalletVerification } from '@/hooks/useEscrowContract'
 
+// Solana explorer helpers
+const explorerBase = import.meta.env.VITE_EXPLORER_URL || 'https://solscan.io'
+const isDevnet = (import.meta.env.VITE_SOLANA_NETWORK || 'devnet') === 'devnet'
+const explorerSuffix = isDevnet ? '?cluster=devnet' : ''
+const txUrl = (sig: string) => `${explorerBase}/tx/${sig}${explorerSuffix}`
+
 interface EscrowPanelProps {
   open: boolean
   onClose: () => void
   escrow: EscrowInfo | null
-  onSubmitPhase?: (escrowId: number, workLink?: string) => void
-  onApprovePhase?: (escrowId: number) => void
-  onRequestRevision?: (escrowId: number, notes?: string) => void
-  onRaiseDispute?: (escrowId: number) => void
+  onSubmitPhase?: (escrowId: string, workLink?: string) => void
+  onApprovePhase?: (escrowId: string) => void
+  onRequestRevision?: (escrowId: string, notes?: string) => void
+  onRaiseDispute?: (escrowId: string) => void
   isLoading?: boolean
 }
 
@@ -126,7 +132,7 @@ function DetailsGrid({ escrow }: { escrow: EscrowInfo }) {
           <ShieldCheck className="w-4 h-4 text-[#737373] shrink-0" strokeWidth={1.5} />
           <span className="text-xs text-[#737373]">Vault Tx:</span>
           <a
-            href={`${import.meta.env.VITE_EXPLORER_URL || 'https://etherscan.io'}/tx/${escrow.txHashFund}`}
+            href={txUrl(escrow.txHashFund)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-[#a6a6a6] hover:text-[#fafafa] transition-colors font-mono underline underline-offset-2 truncate"
@@ -296,7 +302,7 @@ function PhaseTimeline({
                     <ShieldCheck className="w-3 h-3 text-[#737373] shrink-0" strokeWidth={1.5} />
                     <span className="text-xs text-[#737373]">Tx:</span>
                     <a
-                      href={`${import.meta.env.VITE_EXPLORER_URL || 'https://etherscan.io'}/tx/${phase.txHash}`}
+                      href={txUrl(phase.txHash)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-[#737373] hover:text-[#fafafa] transition-colors font-mono underline underline-offset-2"

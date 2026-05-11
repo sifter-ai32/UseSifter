@@ -799,6 +799,7 @@ export interface EscrowPhaseInfo {
   workLinks: Array<{ url: string; submittedAt: string }> | null
   revisionNotes: string | null
   txHash: string | null
+  streamId: string | null
 }
 
 export interface EscrowDisputeInfo {
@@ -825,7 +826,7 @@ export interface EscrowUserInfo {
 
 export interface EscrowInfo {
   id: string
-  chainEscrowId: number
+  chainEscrowId: string
   clientId: string
   freelancerId: string
   projectTitle: string
@@ -856,12 +857,12 @@ export function getEscrow(escrowId: string) {
   return request<EscrowInfo>(`/escrows/${escrowId}`)
 }
 
-export function getEscrowByChainId(chainEscrowId: number) {
+export function getEscrowByChainId(chainEscrowId: string) {
   return request<EscrowInfo>(`/escrows/by-chain/${chainEscrowId}`)
 }
 
 export function createEscrowRecord(data: {
-  chainEscrowId: number
+  chainEscrowId: string
   clientId: string
   freelancerId: string
   projectTitle: string
@@ -878,6 +879,7 @@ export function createEscrowRecord(data: {
     percentageBps: number
     amount: string
     deadline: string
+    streamId?: string
   }[]
 }) {
   return request<EscrowInfo>('/escrows', {

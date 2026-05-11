@@ -419,11 +419,11 @@ function StepCreate({ onBack, onNext }: { onBack: () => void; onNext: () => void
         <Lock className="w-6 h-6 text-[#fafafa]" strokeWidth={1.5} />
       </div>
       <h2 className="text-xl tracking-tight text-[#fafafa] font-normal mb-2">Create Deal Escrow</h2>
-      <p className="text-sm text-[#a6a6a6] leading-relaxed mb-4">Secure your project by funding an escrow. Funds are held safely on the Ethereum blockchain and released only when you approve project milestones.</p>
+      <p className="text-sm text-[#a6a6a6] leading-relaxed mb-4">Secure your project by funding an escrow. Funds are held safely on Solana via Streamflow and released only when you approve project milestones.</p>
       <div className="bg-[#ffffff]/5 border border-[#ffffff]/10 rounded-xl p-4 mb-6 space-y-3">
         <div className="flex items-center gap-2 text-sm text-[#a6a6a6]">
           <CheckCircle className="w-4 h-4 text-[#fafafa]" strokeWidth={1.5} />
-          <span>Smart contract secured funds</span>
+          <span>Streamflow-secured funds on Solana</span>
         </div>
         <div className="flex items-center gap-2 text-sm text-[#a6a6a6]">
           <CheckCircle className="w-4 h-4 text-[#fafafa]" strokeWidth={1.5} />
@@ -431,11 +431,11 @@ function StepCreate({ onBack, onNext }: { onBack: () => void; onNext: () => void
         </div>
         <div className="flex items-center gap-2 text-sm text-[#a6a6a6]">
           <CheckCircle className="w-4 h-4 text-[#fafafa]" strokeWidth={1.5} />
-          <span>Built-in dispute resolution</span>
+          <span>Auto-release on cliff dates</span>
         </div>
         <div className="flex items-center gap-2 text-sm text-[#a6a6a6]">
           <CheckCircle className="w-4 h-4 text-[#fafafa]" strokeWidth={1.5} />
-          <span>2.5% platform fee per side</span>
+          <span>No platform fee</span>
         </div>
       </div>
       <div className="mt-auto pt-4 flex gap-3 border-t border-[#ffffff]/10 shrink-0">
@@ -734,17 +734,17 @@ function StepBudget({
             Chain
           </label>
           <button type="button" onClick={() => setChainOpen(v => !v)} className={dropdownBtnCls}>
-            <img src="/eth-logo.svg" alt="ETH" className="w-5 h-5 shrink-0" />
-            <span className="flex-1 text-left text-sm">Ethereum</span>
+            <img src="/sol-logo.svg" alt="SOL" className="w-5 h-5 shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            <span className="flex-1 text-left text-sm">Solana</span>
             <ChevronDown className={`w-3.5 h-3.5 text-[#737373] transition-transform ${chainOpen ? 'rotate-180' : ''}`} strokeWidth={1.5} />
           </button>
           {chainOpen && (
             <div className={dropdownMenuCls}>
               <button type="button" onClick={() => setChainOpen(false)} className={dropdownItemCls(true)}>
-                <img src="/eth-logo.svg" alt="ETH" className="w-5 h-5 shrink-0" />
+                <img src="/sol-logo.svg" alt="SOL" className="w-5 h-5 shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
                 <div className="flex-1 text-left">
-                  <span>Ethereum</span>
-                  <span className="text-xs text-[#737373] ml-1">{import.meta.env.VITE_NETWORK_NAME || 'Ethereum'}</span>
+                  <span>Solana</span>
+                  <span className="text-xs text-[#737373] ml-1">{import.meta.env.VITE_SOLANA_NETWORK === 'mainnet-beta' ? 'Mainnet' : 'Devnet'}</span>
                 </div>
               </button>
             </div>
@@ -847,7 +847,7 @@ function StepBudget({
         {!walletConnected ? (
           <button type="button" onClick={connectWallet} className={`${inputCls} flex items-center justify-center gap-2 cursor-pointer hover:bg-[#ffffff]/[0.05]`}>
             <Wallet className="w-4 h-4" strokeWidth={1.5} />
-            <span>Connect MetaMask</span>
+            <span>Connect Phantom / Solflare</span>
           </button>
         ) : (
           <>
@@ -886,13 +886,11 @@ function StepReview({
   onBack: () => void; onConfirm: () => void; onCancel: () => void
 }) {
   const token = tokenLabel(selectedToken)
-  const deposit = requiredDeposit ?? budgetNum * 1.025
+  const deposit = requiredDeposit ?? budgetNum
 
   const flowLabel = (() => {
     switch (flowStep) {
-      case 'creating': return 'Creating escrow on-chain...'
-      case 'approving': return `Approving ${token} spend...`
-      case 'funding': return 'Funding escrow...'
+      case 'creating': return 'Creating Streamflow escrow on Solana...'
       default: return null
     }
   })()
@@ -914,7 +912,7 @@ function StepReview({
           <span className="text-lg font-normal text-[#fafafa]">{budgetNum.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {token}</span>
         </div>
         <div className="flex justify-between items-center mb-3 pb-3 border-b border-[#ffffff]/10">
-          <span className="text-sm text-[#a6a6a6]">Required Deposit (incl. 2.5% fee)</span>
+          <span className="text-sm text-[#a6a6a6]">Required Deposit</span>
           <span className="text-sm font-normal text-[#fafafa]">{deposit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {token}</span>
         </div>
         <div className="space-y-3">
@@ -993,7 +991,7 @@ function WalletStatus({ walletAddress, isCorrectChain }: { walletAddress?: strin
           <div>
             <p className="text-sm text-[#f59e0b] font-normal">Wrong wallet connected</p>
             <p className="text-xs text-[#f59e0b]/70 mt-0.5">Connected: <span className="font-mono">{shortAddr}</span></p>
-            <p className="text-xs text-[#f59e0b]/70 mt-1 leading-relaxed">Please switch MetaMask to the wallet you registered in Settings.</p>
+            <p className="text-xs text-[#f59e0b]/70 mt-1 leading-relaxed">Please switch your Solana wallet to the address you registered in Settings.</p>
           </div>
         </div>
       ) : (
@@ -1003,7 +1001,7 @@ function WalletStatus({ walletAddress, isCorrectChain }: { walletAddress?: strin
             <span className="text-sm font-mono">{shortAddr}</span>
           </div>
           {!isCorrectChain && (
-            <span className="text-xs text-[#f59e0b] bg-[#f59e0b]/10 px-2 py-0.5 rounded-full">Switch to {import.meta.env.VITE_NETWORK_NAME || 'Ethereum'}</span>
+            <span className="text-xs text-[#f59e0b] bg-[#f59e0b]/10 px-2 py-0.5 rounded-full">Switch to Solana {import.meta.env.VITE_SOLANA_NETWORK === 'mainnet-beta' ? 'Mainnet' : 'Devnet'}</span>
           )}
         </div>
       )}
@@ -1018,7 +1016,7 @@ function StepSuccess({ onFinish }: { onFinish: () => void }) {
         <PartyPopper className="w-10 h-10 text-[#fafafa]" strokeWidth={1.5} />
       </div>
       <h2 className="text-2xl tracking-tight text-[#fafafa] font-normal mb-3">Congratulations!</h2>
-      <p className="text-sm text-[#a6a6a6] leading-relaxed mb-10 max-w-[260px]">Your escrow has been successfully created and funded on-chain. The contract is active and Phase 1 has officially begun.</p>
+      <p className="text-sm text-[#a6a6a6] leading-relaxed mb-10 max-w-[260px]">Your escrow has been successfully created and funded on Solana via Streamflow. The streams are active and Phase 1 has officially begun.</p>
       <button type="button" onClick={onFinish} className="w-full bg-[#fafafa] text-[#000000] hover:bg-[#a6a6a6] transition-colors py-3 rounded-lg text-sm font-normal shrink-0 cursor-pointer">
         Return to Chat
       </button>

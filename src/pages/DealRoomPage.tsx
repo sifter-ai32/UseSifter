@@ -18,6 +18,7 @@ import { useEscrow } from '@/hooks/useEscrow'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useAuthStore } from '@/stores/authStore'
 import { getInitials, formatTime, getImageUrl } from '@/lib/utils'
+import * as api from '@/lib/api'
 import {
   listWorkspaces, getWorkspace, getWorkspaceMessages, uploadWorkspaceFile,
   createInviteLink, archiveWorkspace, unarchiveWorkspace,
@@ -904,44 +905,96 @@ export default function DealRoomPage() {
         open={escrow.slideOutOpen}
         onClose={() => escrow.setSlideOutOpen(false)}
         escrow={escrow.activeEscrow}
-        onSubmitPhase={(id, workLink) => {
-          // Save work link to DB (backend appends to workLinks history), then trigger blockchain tx
+        onSubmitPhase={async (_id, workLink) => {
+          // Submit = pure DB update (no on-chain action on Streamflow)
           const ae = escrow.activeEscrow
-          if (ae && workLink) {
-            const currentPhase = ae.phases.find(p => p.status === 'Pending')
-            if (currentPhase) {
-              // Optimistically update workLinks in cache
-              const existingLinks = Array.isArray(currentPhase.workLinks) ? currentPhase.workLinks : []
-              const newLinks = [...existingLinks, { url: workLink, submittedAt: new Date().toISOString() }]
-              queryClient.setQueryData<api.EscrowInfo[]>(
-                ['workspace-escrows', activeId, user?.id],
-                (old) => old?.map(e => e.id === ae.id ? {
-                  ...e,
-                  phases: e.phases.map(p => p.phaseIndex === currentPhase.phaseIndex ? { ...p, workLink, workLinks: newLinks } : p),
-                } : e)
-              )
-              import('@/lib/api').then(a =>
-                a.updateEscrowPhase(ae.id, currentPhase.phaseIndex, { workLink }).catch(() => {})
-              )
-            }
+          if (!ae || !workLink) return
+          const currentPhase = ae.phases.find(p => p.status === 'Pending')
+          if (!currentPhase) return
+
+          // Optimistic UI update
+          const existingLinks = Array.isArray(currentPhase.workLinks) ? currentPhase.workLinks : []
+          const newLinks = [...existingLinks, { url: workLink, submittedAt: new Date().toISOString() }]
+          queryClient.setQueryData<api.EscrowInfo[]>(
+            ['workspace-escrows', activeId, user?.id],
+            (old) => old?.map(e => e.id === ae.id ? {
+              ...e,
+              phases: e.phases.map(p => p.phaseIndex === currentPhase.phaseIndex
+                ? { ...p, workLink, workLinks: newLinks, status: 'Submitted' }
+                : p),
+            } : e)
+          )
+
+          try {
+            await api.updateEscrowPhase(ae.id, currentPhase.phaseIndex, {
+              status: 'Submitted',
+              workLink,
+              submittedAt: new Date().toISOString(),
+            })
+          } catch (e) {
+            console.error('Failed to submit phase:', e)
           }
-          escrow.escrowWrite.submitPhaseCompletion(id)
         }}
-        onApprovePhase={(id) => escrow.escrowWrite.approvePhase(id)}
-        onRequestRevision={(id, notes) => {
-          // Save revision notes to DB, then trigger blockchain tx
+        onApprovePhase={async (_id) => {
+          // Approve = cancel stream + direct USDC transfer to freelancer
           const ae = escrow.activeEscrow
-          if (ae && notes) {
-            const currentPhase = ae.phases.find(p => p.status === 'Submitted')
-            if (currentPhase) {
-              import('@/lib/api').then(api =>
-                api.updateEscrowPhase(ae.id, currentPhase.phaseIndex, { revisionNotes: notes }).catch(() => {})
-              )
-            }
+          if (!ae) return
+          const currentPhase = ae.phases.find(p => p.status === 'Submitted')
+          if (!currentPhase?.streamId || !ae.freelancer.walletAddress) {
+            console.error('Phase missing streamId or freelancer wallet')
+            return
           }
-          escrow.escrowWrite.requestRevision(id)
+
+          try {
+            const txHash = await escrow.escrowWrite.approvePhase({
+              streamId: currentPhase.streamId,
+              phaseAmount: parseFloat(currentPhase.amount),
+              freelancerWallet: ae.freelancer.walletAddress,
+            })
+            await api.updateEscrowPhase(ae.id, currentPhase.phaseIndex, {
+              status: 'Approved',
+              txHash,
+            })
+            queryClient.invalidateQueries({ queryKey: ['workspace-escrows'] })
+          } catch (e) {
+            console.error('Failed to approve phase:', e)
+          }
         }}
-        onRaiseDispute={(id) => escrow.escrowWrite.raiseDispute(id)}
+        onRequestRevision={async (_id, notes) => {
+          // Revision = pure DB update (no on-chain action)
+          const ae = escrow.activeEscrow
+          if (!ae) return
+          const currentPhase = ae.phases.find(p => p.status === 'Submitted')
+          if (!currentPhase) return
+
+          try {
+            await api.updateEscrowPhase(ae.id, currentPhase.phaseIndex, {
+              status: 'Pending',
+              revisionNotes: notes,
+              revisionCount: currentPhase.revisionCount + 1,
+            })
+            queryClient.invalidateQueries({ queryKey: ['workspace-escrows'] })
+          } catch (e) {
+            console.error('Failed to request revision:', e)
+          }
+        }}
+        onRaiseDispute={async (_id) => {
+          // Dispute = platform-level / off-chain for hackathon
+          const ae = escrow.activeEscrow
+          if (!ae || !user) return
+          const currentPhase = ae.phases.find(p => p.status === 'Pending' || p.status === 'Submitted')
+          if (!currentPhase) return
+
+          try {
+            await api.createEscrowDispute(ae.id, {
+              phaseIndex: currentPhase.phaseIndex,
+              raisedById: user.id,
+            })
+            queryClient.invalidateQueries({ queryKey: ['workspace-escrows'] })
+          } catch (e) {
+            console.error('Failed to raise dispute:', e)
+          }
+        }}
         isLoading={escrow.escrowWrite.isLoading}
       />
     </div>

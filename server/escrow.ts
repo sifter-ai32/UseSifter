@@ -100,7 +100,7 @@ router.post('/', async (req, res) => {
     phases, workspaceId,
   } = req.body
 
-  if (!chainEscrowId && chainEscrowId !== 0) {
+  if (!chainEscrowId || typeof chainEscrowId !== 'string') {
     res.status(400).json({ error: 'chainEscrowId is required' })
     return
   }
@@ -112,7 +112,7 @@ router.post('/', async (req, res) => {
   try {
     const escrow = await prisma.escrow.create({
       data: {
-        chainEscrowId: Number(chainEscrowId),
+        chainEscrowId: String(chainEscrowId),
         clientId,
         freelancerId,
         projectTitle: projectTitle || 'Untitled Project',
@@ -124,12 +124,13 @@ router.post('/', async (req, res) => {
         txHashCreate: txHashCreate || null,
         workspaceId: workspaceId || null,
         phases: phases ? {
-          create: phases.map((p: { phaseIndex: number; description?: string; percentageBps: number; amount: string; deadline: string }) => ({
+          create: phases.map((p: { phaseIndex: number; description?: string; percentageBps: number; amount: string; deadline: string; streamId?: string }) => ({
             phaseIndex: p.phaseIndex,
             description: p.description || null,
             percentageBps: p.percentageBps,
             amount: String(p.amount),
             deadline: new Date(p.deadline),
+            streamId: p.streamId || null,
           })),
         } : undefined,
       },
@@ -146,10 +147,10 @@ router.post('/', async (req, res) => {
 
 // ──── Static paths MUST come before /:id param routes ────
 
-// GET /by-chain/:chainId — Get escrow by on-chain ID
+// GET /by-chain/:chainId — Get escrow by on-chain ID (Streamflow metadataId)
 router.get('/by-chain/:chainId', async (req, res) => {
   const escrow = await prisma.escrow.findUnique({
-    where: { chainEscrowId: Number(req.params.chainId) },
+    where: { chainEscrowId: req.params.chainId },
     include: {
       client: { select: { id: true, name: true, walletAddress: true } },
       freelancer: { select: { id: true, name: true, walletAddress: true } },
