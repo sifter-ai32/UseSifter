@@ -14,14 +14,10 @@ ARG VITE_FIREBASE_API_KEY
 ARG VITE_FIREBASE_AUTH_DOMAIN
 ARG VITE_FIREBASE_PROJECT_ID
 ARG VITE_FIREBASE_APP_ID
-ARG VITE_CHAIN_ID
-ARG VITE_ESCROW_FACTORY
-ARG VITE_USDC
-ARG VITE_USDT
-ARG VITE_ALCHEMY_URL
+ARG VITE_SOLANA_NETWORK
+ARG VITE_SOLANA_RPC_URL
+ARG VITE_USDC_MINT
 ARG VITE_EXPLORER_URL
-ARG VITE_NETWORK_NAME
-ARG VITE_ARBITRATOR
 ARG VITE_FORCE_DUMMY
 ARG VITE_API_URL
 
@@ -48,8 +44,6 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/admin/dist ./admin/dist
 COPY --from=build /app/src/generated ./src/generated
 COPY --from=build /app/server ./server
-COPY --from=build /app/keeper.ts ./
-
 EXPOSE 3001
 
 CMD ["node", "--import", "tsx", "server/index.ts"]
