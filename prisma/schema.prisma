@@ -1,0 +1,375 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  password     String?
+  name         String   @default("")
+  userType     String?  // 'client' or 'talent'
+  avatar       String?
+  banner       String?
+  bio          String?
+  headline     String?
+  title        String?   // professional title e.g. "Full Stack Developer"
+  location     String?
+  experience   Int?      // years of experience
+  skills       String[] @default([])
+  categories   String[] @default([])  // expertise categories
+  socialLinks  Json?     // [{platform, url}]
+  workHistory  Json?     // [{role, company, startDate, endDate, current, description}]
+  portfolio    Json?     // [{title, month, year, description, techStack, link}]
+  languages    Json?     // [{name, proficiency}]
+  education    Json?     // [{institution, degree, startYear, endYear}]
+  hourlyRate   Float?
+  minBudget    Float?
+  ratePref     String?   // 'hourly' or 'fixed'
+  availability Int?      // hours per week
+  longTerm     Boolean   @default(true)
+  walletAddress String?  @unique  // Solana wallet address (base58)
+  phone        String?
+  phoneCode    String?   // e.g. "+1"
+  backupEmail  String?
+  backupEmailVerified Boolean @default(false)
+  timezone     String?
+  twoFactorSecret  String?   // TOTP secret (base32 encoded)
+  twoFactorEnabled Boolean   @default(false)
+  firebaseUid  String?  @unique
+  authProvider       String   @default("email") // 'email' or 'google'
+  onboardingComplete Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Client relations
+  projectsOwned  Project[]     @relation("ProjectOwner")
+  messagesFrom   Message[]     @relation("MessageSender")
+
+  // Talent relations
+  proposals      Proposal[]
+  projectsWorked ProjectMember[]
+
+  // Workspace (Deal Room) relations
+  workspaceMembers  WorkspaceMember[]
+  workspaceMessages WorkspaceMessage[] @relation("WorkspaceMessageSender")
+
+  // Negotiation relations
+  negotiationsAsFreelancer Negotiation[] @relation("NegotiationFreelancer")
+  negotiationsAsClient     Negotiation[] @relation("NegotiationClient")
+
+  // AI Chat relations
+  aiChatSessions AiChatSession[]
+
+  // Blockchain Escrow relations
+  escrowsAsClient     Escrow[]        @relation("EscrowClient")
+  escrowsAsFreelancer Escrow[]        @relation("EscrowFreelancer")
+  escrowDisputesRaised EscrowDispute[] @relation("EscrowDisputeRaisedBy")
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  budget      Float?
+  requirements Json?    // Structured requirements from AI chat intake
+  status      String   @default("Beginning") // Beginning, Processing, Completed
+  progress    Int      @default(0)
+  dueDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ownerId     String
+  owner       User     @relation("ProjectOwner", fields: [ownerId], references: [id])
+
+  members     ProjectMember[]
+  proposals    Proposal[]
+  phases       Phase[]
+  dealRoom     DealRoom?
+  negotiations Negotiation[]
+  aiChatSession AiChatSession?
+}
+
+model ProjectMember {
+  id        String @id @default(cuid())
+  role      String @default("talent") // talent, reviewer, etc.
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+
+  userId    String
+  user      User   @relation(fields: [userId], references: [id])
+
+  joinedAt  DateTime @default(now())
+
+  @@unique([projectId, userId])
+}
+
+model Phase {
+  id        String  @id @default(cuid())
+  name      String
+  status    String  @default("pending") // pending, active, completed
+  order     Int
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+}
+
+model Proposal {
+  id        String   @id @default(cuid())
+  coverLetter String?
+  bidAmount  Float?
+  status     String   @default("pending") // pending, accepted, rejected
+  createdAt  DateTime @default(now())
+
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id])
+
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model DealRoom {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  projectId    String?  @unique
+  project      Project? @relation(fields: [projectId], references: [id])
+
+  clientId     String?
+  freelancerId String?
+
+  messages  Message[]
+
+  @@unique([clientId, freelancerId])
+}
+
+model PendingSignup {
+  id             String   @id @default(cuid())
+  email          String
+  hashedPassword String
+  otpCode        String
+  expiresAt      DateTime
+  attempts       Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  @@index([email])
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  content     String
+  fileUrl     String?
+  fileType    String?  // 'image' or 'pdf'
+  fileName    String?
+  messageType String   @default("text") // 'text' | 'workspace_invitation'
+  metadata    Json?    // For invitations: { workspaceId, workspaceName, status }
+  createdAt   DateTime @default(now())
+
+  senderId  String
+  sender    User     @relation("MessageSender", fields: [senderId], references: [id])
+
+  dealRoomId String
+  dealRoom   DealRoom @relation(fields: [dealRoomId], references: [id])
+}
+
+// ──── Workspace (Group Deal Room) ────
+
+model Workspace {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  creatorId   String
+  sourceDealRoomId String? // The 1:1 DealRoom that spawned this workspace
+  archived    Boolean   @default(false)
+  archivedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     WorkspaceMember[]
+  messages    WorkspaceMessage[]
+  inviteLinks WorkspaceInviteLink[]
+}
+
+model WorkspaceMember {
+  id       String   @id @default(cuid())
+  role     String   @default("member") // 'owner' | 'member'
+  joinedAt DateTime @default(now())
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([workspaceId, userId])
+}
+
+model WorkspaceMessage {
+  id          String   @id @default(cuid())
+  content     String
+  fileUrl     String?
+  fileType    String?
+  fileName    String?
+  messageType String   @default("text") // 'text' | 'wallet_request'
+  metadata    Json?    // For wallet_request: { requestedById, requestedByName, freelancerId, status }
+  createdAt   DateTime @default(now())
+
+  senderId    String
+  sender      User      @relation("WorkspaceMessageSender", fields: [senderId], references: [id])
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model WorkspaceInviteLink {
+  id          String    @id @default(cuid())
+  token       String    @unique
+  expiresAt   DateTime?
+  maxUses     Int?
+  uses        Int       @default(0)
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  createdById String
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+}
+
+// ──── Negotiation (AI Negotiator Bot) ────
+
+model Negotiation {
+  id                      String   @id @default(cuid())
+  status                  String   @default("outreach_pending")
+  currentRound            Int      @default(0)
+  startingOffer           Float
+  round2Max               Float
+  round3Max               Float
+  absoluteCeiling         Float
+  currentOffer            Float?
+  freelancerCounter       Float?
+  finalRate               Float?
+  rateType                String   @default("hourly")
+  currency                String   @default("USD")
+  freelancerSentiment     String   @default("neutral")
+  keyConcerns             String[] @default([])
+  conversationSummary     String   @default("")
+  followUpCount           Int      @default(0)
+  turnCount               Int      @default(0)
+  openaiResponseId        String?
+  lastFreelancerMessageAt DateTime?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  projectId    String
+  project      Project @relation(fields: [projectId], references: [id])
+
+  freelancerId String
+  freelancer   User @relation("NegotiationFreelancer", fields: [freelancerId], references: [id])
+
+  clientId     String
+  client       User @relation("NegotiationClient", fields: [clientId], references: [id])
+
+  messages     NegotiationMessage[]
+
+  @@unique([projectId, freelancerId])
+}
+
+model NegotiationMessage {
+  id            String      @id @default(cuid())
+  role          String      // "bot" | "freelancer" | "system"
+  content       String
+  toolCall      String?
+  toolData      Json?
+  createdAt     DateTime    @default(now())
+
+  negotiationId String
+  negotiation   Negotiation @relation(fields: [negotiationId], references: [id], onDelete: Cascade)
+}
+
+// ──── AI Chat Session (Client Project Intake) ────
+
+model AiChatSession {
+  id                 String   @id @default(cuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id])
+  projectId          String?  @unique
+  project            Project? @relation(fields: [projectId], references: [id])
+  openaiResponseId   String?  // Latest response ID for conversation chaining
+  title              String?  // Auto-generated from first message
+  status             String   @default("collecting") // collecting | matching | completed
+  collectedFields    Json?    // { scope, skills, budget, timeline, preferences, confirmed, ... }
+  matchedFreelancers Json?    // Array of { userId, name, title, skills, score, rationale }
+  chatMessages       Json?    // Array of { role: 'user'|'assistant', content: string }
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+// ──── Blockchain Escrow ────
+
+model Escrow {
+  id                 String   @id @default(cuid())
+  chainEscrowId      String   @unique  // Streamflow first-phase metadataId (base58)
+  clientId           String
+  client             User     @relation("EscrowClient", fields: [clientId], references: [id])
+  freelancerId       String
+  freelancer         User     @relation("EscrowFreelancer", fields: [freelancerId], references: [id])
+  projectTitle       String
+  projectDescription String?
+  tokenAddress       String   // USDC or USDT contract address
+  totalAmount        String   // Raw 6-decimal units as string (BigInt)
+  totalDeposit       String   // Raw 6-decimal units as string (BigInt)
+  status             String   @default("Created") // Created, Funded, Active, Completed, Cancelled, Disputed
+  autoReleaseTimeout Int      // Seconds (7-30 days)
+  txHashCreate       String?
+  txHashFund         String?
+  createdAt          DateTime @default(now())
+  fundedAt           DateTime?
+
+  workspaceId        String?  // Links escrow to the workspace it was created in
+  network            String   @default("devnet")  // "mainnet-beta" or "devnet"
+
+  phases             EscrowPhase[]
+  disputes           EscrowDispute[]
+}
+
+model EscrowPhase {
+  id              String    @id @default(cuid())
+  escrowId        String
+  escrow          Escrow    @relation(fields: [escrowId], references: [id], onDelete: Cascade)
+  phaseIndex      Int       // 0-based index matching on-chain currentPhase
+  description     String?
+  percentageBps   Int       // e.g., 3000 = 30%
+  amount          String    // Raw 6-decimal units as string
+  deadline        DateTime
+  status          String    @default("Pending") // Pending, Submitted, Approved, Disputed, AutoReleased, Cancelled
+  revisionCount   Int       @default(0)
+  submittedAt     DateTime?
+  workLink        String?   // Latest URL submitted by freelancer
+  workLinks       Json?     // History of all submissions: [{url, submittedAt}]
+  revisionNotes   String?   // Client's revision feedback
+  streamId        String?   // Streamflow metadataId for this phase (base58)
+  txHash          String?   // Transaction signature for phase release/approval
+
+  @@unique([escrowId, phaseIndex])
+}
+
+model EscrowDispute {
+  id                  String    @id @default(cuid())
+  escrowId            String
+  escrow              Escrow    @relation(fields: [escrowId], references: [id], onDelete: Cascade)
+  phaseIndex          Int
+  raisedById          String
+  raisedBy            User      @relation("EscrowDisputeRaisedBy", fields: [raisedById], references: [id])
+  reason              String?
+  status              String    @default("open") // open, resolved
+  freelancerShareBps  Int?      // Set when resolved (0-10000)
+  resolvedAt          DateTime?
+  createdAt           DateTime  @default(now())
+}

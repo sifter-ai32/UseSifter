@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma init)",
+      "Bash(npx prisma db push)",
+      "Bash(npx prisma generate)",
+      "Bash(npx tsx /Users/bhanuteja/Downloads/UseSifter/server/seed.ts)",
+      "Bash(node -e \"const OpenAI = require\\(''openai''\\); const c = new OpenAI\\({apiKey: ''test''}\\); console.log\\(typeof c.responses\\)\")"
+    ]
+  }
+}

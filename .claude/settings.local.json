@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --version:*)",
+      "Bash(npm --version:*)",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run dev)",
+      "Bash(curl -s -X POST http://localhost:3001/api/auth/login -H \"Content-Type: application/json\" -d '{\"\"email\"\":\"\"client\"\",\"\"password\"\":\"\"client\"\"}')",
+      "Bash(curl -s http://localhost:3001/api/projects)",
+      "Bash(kill %1)",
+      "Bash(pkill -f \"tsx.*server/index.ts\")",
+      "Read(//Users/bhanuteja/Downloads/**)"
+    ]
+  }
+}
