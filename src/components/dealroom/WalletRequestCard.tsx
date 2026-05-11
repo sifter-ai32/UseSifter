@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Wallet, CheckCircle, Loader2, AlertTriangle } from 'lucide-react'
-import { useAccount, useConnect } from 'wagmi'
-import { injected } from 'wagmi/connectors'
+import { useWallet } from '@solana/wallet-adapter-react'
+import { useWalletModal } from '@solana/wallet-adapter-react-ui'
 import type { WorkspaceMessageInfo } from '@/lib/api'
 
 interface WalletRequestCardProps {
@@ -10,27 +10,29 @@ interface WalletRequestCardProps {
   onConnect: (messageId: string, walletAddress: string) => void
 }
 
+function isValidSolanaAddress(addr: string): boolean {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr)
+}
+
 export default function WalletRequestCard({ message, isFreelancer, onConnect }: WalletRequestCardProps) {
   const meta = message.metadata as { requestedByName?: string; freelancerName?: string; status?: string; walletAddress?: string } | null
   const isConnected = meta?.status === 'connected'
-  const { address, isConnected: walletConnected } = useAccount()
-  const { connectAsync } = useConnect()
+  const { publicKey, connected } = useWallet()
+  const { setVisible } = useWalletModal()
   const [loading, setLoading] = useState(false)
   const [manualMode, setManualMode] = useState(false)
   const [manualAddress, setManualAddress] = useState('')
   const [error, setError] = useState('')
 
-  const handleMetaMaskConnect = async () => {
+  const handlePhantomConnect = async () => {
     setError('')
     setLoading(true)
     try {
-      if (!walletConnected) {
-        const result = await connectAsync({ connector: injected() })
-        if (result.accounts[0]) {
-          onConnect(message.id, result.accounts[0])
-        }
-      } else if (address) {
-        onConnect(message.id, address)
+      if (connected && publicKey) {
+        onConnect(message.id, publicKey.toBase58())
+      } else {
+        setVisible(true)
+        // After modal closes, user will be connected — they can click again
       }
     } catch {
       setError('Failed to connect wallet. Try pasting your address manually.')
@@ -43,8 +45,8 @@ export default function WalletRequestCard({ message, isFreelancer, onConnect }: 
   const handleManualSubmit = () => {
     setError('')
     const trimmed = manualAddress.trim()
-    if (!/^0x[a-fA-F0-9]{40}$/.test(trimmed)) {
-      setError('Invalid wallet address. Must be a valid Ethereum address (0x...).')
+    if (!isValidSolanaAddress(trimmed)) {
+      setError('Invalid Solana wallet address.')
       return
     }
     onConnect(message.id, trimmed)
@@ -52,7 +54,9 @@ export default function WalletRequestCard({ message, isFreelancer, onConnect }: 
 
   // Already connected state
   if (isConnected) {
-    const shortAddr = meta?.walletAddress ? `${meta.walletAddress.slice(0, 6)}...${meta.walletAddress.slice(-4)}` : ''
+    const shortAddr = meta?.walletAddress
+      ? `${meta.walletAddress.slice(0, 4)}...${meta.walletAddress.slice(-4)}`
+      : ''
     return (
       <div className="flex justify-center my-2">
         <div className="bg-[#ffffff]/[0.04] border border-[#ffffff]/10 rounded-2xl px-5 py-4 max-w-[400px] w-full">
@@ -86,7 +90,9 @@ export default function WalletRequestCard({ message, isFreelancer, onConnect }: 
             </div>
             <div>
               <p className="text-sm font-medium text-[#fafafa]">Wallet Connection Required</p>
-              <p className="text-xs text-[#a6a6a6] mt-0.5">{meta?.requestedByName} wants to create an escrow with you. Connect your wallet to proceed.</p>
+              <p className="text-xs text-[#a6a6a6] mt-0.5">
+                {meta?.requestedByName} wants to create an escrow with you. Connect your Solana wallet to proceed.
+              </p>
             </div>
           </div>
 
@@ -100,14 +106,16 @@ export default function WalletRequestCard({ message, isFreelancer, onConnect }: 
           {!manualMode ? (
             <div className="flex flex-col gap-2">
               <button
-                onClick={handleMetaMaskConnect}
+                onClick={handlePhantomConnect}
                 disabled={loading}
                 className="w-full bg-[#f59e0b] text-[#000000] hover:bg-[#d97706] transition-colors py-2.5 rounded-xl text-sm font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <><Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} /> Connecting...</>
+                ) : connected && publicKey ? (
+                  <><Wallet className="w-4 h-4" strokeWidth={1.5} /> Use Connected Wallet</>
                 ) : (
-                  <><Wallet className="w-4 h-4" strokeWidth={1.5} /> Connect with MetaMask</>
+                  <><Wallet className="w-4 h-4" strokeWidth={1.5} /> Connect Phantom / Solflare</>
                 )}
               </button>
               <button
@@ -123,7 +131,7 @@ export default function WalletRequestCard({ message, isFreelancer, onConnect }: 
                 type="text"
                 value={manualAddress}
                 onChange={(e) => setManualAddress(e.target.value)}
-                placeholder="0x..."
+                placeholder="Solana address (e.g. 7xKqR...)"
                 className="w-full bg-[#ffffff]/5 border border-[#ffffff]/10 rounded-xl px-4 py-2.5 text-sm text-[#fafafa] placeholder:text-[#525252] focus:outline-none focus:border-[#ffffff]/30 font-mono"
               />
               <div className="flex gap-2">
