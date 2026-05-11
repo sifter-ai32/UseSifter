@@ -10,13 +10,13 @@ import {
   createTransferInstruction,
   getAccount,
 } from '@solana/spl-token'
-import { SolanaStreamClient, getBN, Cluster } from '@streamflow/stream'
+import { SolanaStreamClient, getBN, ICluster } from '@streamflow/stream'
 import { USDC_MINT, SOLANA_RPC_URL, SOLANA_NETWORK } from '@/lib/solana'
 import { toRawAmount, fromRawAmount } from '@/lib/contracts'
 
 // ── Streamflow client (singleton, no wallet needed for reads) ──
-const streamflowCluster: Cluster =
-  SOLANA_NETWORK === 'mainnet-beta' ? Cluster.Mainnet : Cluster.Devnet
+const streamflowCluster: ICluster =
+  SOLANA_NETWORK === 'mainnet-beta' ? ICluster.Mainnet : ICluster.Devnet
 
 const sfClient = new SolanaStreamClient({
   clusterUrl: SOLANA_RPC_URL,

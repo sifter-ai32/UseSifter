@@ -2,6 +2,10 @@ import { USDC_MINT } from '@/lib/solana'
 
 export { USDC_MINT }
 
+// Aliases kept for backward compatibility with existing hooks
+export const USDC_ADDRESS = USDC_MINT
+export const USDT_ADDRESS = USDC_MINT  // Solana: only USDC supported, map USDT to USDC
+
 export const TOKEN_OPTIONS = [
   { label: 'USDC', address: USDC_MINT, decimals: 6 },
 ] as const
@@ -28,6 +32,15 @@ export const EscrowStatusLabel: Record<string, string> = {
   Cancelled: 'Cancelled',
   Disputed: 'Disputed',
 }
+
+export const PhaseStatus = {
+  Pending: 'Pending',
+  Submitted: 'Submitted',
+  Approved: 'Approved',
+  Disputed: 'Disputed',
+  AutoReleased: 'AutoReleased',
+  Cancelled: 'Cancelled',
+} as const
 
 export const PhaseStatusLabel: Record<string, string> = {
   Pending: 'Pending',
