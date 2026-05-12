@@ -47,16 +47,27 @@ if (!admin.apps.length) {
 const app = express()
 const httpServer = createServer(app)
 
-const ALLOWED_ORIGINS = process.env.CORS_ORIGINS
+const ALLOWED_LITERAL_ORIGINS = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',')
   : [
       'http://localhost:5173',
       'http://localhost:5174',
       'https://usesifter.vercel.app',
-      /\.vercel\.app$/,
     ]
 
-const io = new Server(httpServer, { cors: { origin: ALLOWED_ORIGINS } })
+const isAllowedOrigin = (origin: string | undefined): boolean => {
+  if (!origin) return true
+  if (ALLOWED_LITERAL_ORIGINS.includes(origin)) return true
+  if (/\.vercel\.app$/.test(origin)) return true
+  return false
+}
+
+const corsOrigin = (
+  origin: string | undefined,
+  cb: (err: Error | null, allow?: boolean) => void,
+) => cb(null, isAllowedOrigin(origin))
+
+const io = new Server(httpServer, { cors: { origin: corsOrigin } })
 const PORT = process.env.PORT || 3001
 
 const upload = multer({ dest: '/tmp/sifter-uploads/', limits: { fileSize: 10 * 1024 * 1024 } })
@@ -85,7 +96,7 @@ const chatUpload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 })
 
-app.use(cors({ origin: ALLOWED_ORIGINS }))
+app.use(cors({ origin: corsOrigin, credentials: true }))
 app.use(express.json())
 app.use('/uploads', express.static(uploadsDir))
 
