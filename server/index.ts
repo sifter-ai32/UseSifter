@@ -49,7 +49,12 @@ const httpServer = createServer(app)
 
 const ALLOWED_ORIGINS = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',')
-  : ['http://localhost:5173', 'http://localhost:5174']
+  : [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'https://usesifter.vercel.app',
+      /\.vercel\.app$/,
+    ]
 
 const io = new Server(httpServer, { cors: { origin: ALLOWED_ORIGINS } })
 const PORT = process.env.PORT || 3001
